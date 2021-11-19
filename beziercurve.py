@@ -298,6 +298,21 @@ def raise_degree():
     nPoint += 1
     recompute_gui()
 
+def helper_reduce_degree_approx(newPoint):
+    """takes list of new reduced degree Points and set all variable"""
+    global nPoint, Points, daPoints, entryP, C, root
+    if nPoint == 2:
+        return
+    Points = newPoint
+    daPoints[-1].remove()
+    daPoints.pop()
+    for i in range(len(Points)):
+        daPoints[i].move(Points[i])
+
+    pop_ctrl_point()
+    nPoint -= 1
+    recompute_gui()
+
 def reduce_degree():
     """remove last point from curve, 
     TODO: curve approximation can be implemented
@@ -313,6 +328,47 @@ def reduce_degree():
     nPoint -= 1
     recompute_gui()
 
+def approx_reduce():
+    """reduce degree by formula"""
+    global nPoint, Points
+    if nPoint == 2:
+        return
+
+    n = nPoint-1 #degree = n = total_control_points - 1
+    e = [[0.0, 0.0]] #stores ei for i = [0, n-1]
+    nCi = [1] #stores nCi for i = [0, n]
+    
+    #compute nCi
+    for i in range(1, n+1): #i = [1, n]
+        nCi.append((nCi[-1]*(n-i+1))//i)
+    
+    sumnCi2 = 0 #stores summation((nCi)**2) for i = [1, n-1]
+    for i in range(1, n):
+        sumnCi2 += nCi[i]**2
+    
+    sumSnCiPi = [0.0, 0.0] #stores summation((-1)**(n-i)*(nCi)*Pi) for i = [0, n]
+    for i in range(0, n+1):
+        sign = -1 if (n-i)&1 else 1 #(-1)**(n-i)
+        coff = sign*nCi[i]
+        sumSnCiPi = [coff*Points[i][0]+sumSnCiPi[0], coff*Points[i][1]+sumSnCiPi[1]]
+        
+    #compute ei = -((-1)**(n-i))*(nCi)*(sumSnCiPi/sumnCi2)
+    for i in range(1, n):
+        sign = -1 if (n-i)&1 else 1 #(-1)**(n-i)
+        ei = -(sign*nCi[i])/sumnCi2
+        e.append([sumSnCiPi[0]*ei, sumSnCiPi[1]*ei])
+    
+    #compute new reduced points
+    newPoint = [Points[0]]
+    for i in range(1, n): #for i = [1, n-1]
+        f1 = n/(n-i)
+        f2 = i/(n-i)
+        f1 = [f1*(Points[i][0]+e[i][0]), f1*(Points[i][1]+e[i][1])]
+        
+        f2 = [f2*newPoint[i-1][0], f2*newPoint[i-1][1]]
+        newPoint.append([int(f1[0]-f2[0]), int(f1[1]-f2[1])])
+    
+    helper_reduce_degree_approx(newPoint)
 
 def init_window():
     """init widgets and configure canvas"""
@@ -321,8 +377,11 @@ def init_window():
     #button to raise degree
     Button(sideframe.scrollable_frame, text='Raise Degree', command=raise_degree).pack(pady = 10)
 
-    #button to reduce degree
-    Button(sideframe.scrollable_frame, text='Reduce Degree', command=reduce_degree).pack(pady = 10)
+    #button to approx reduce degree
+    Button(sideframe.scrollable_frame, text='Reduce Degree Approx', command=approx_reduce).pack(pady = 10)
+
+    #button to reduce degree by removing last point
+    Button(sideframe.scrollable_frame, text='Remove Last Point', command=reduce_degree).pack(pady = 10)
 
     #constructing slider
     Label(sideframe.scrollable_frame, text="t[0,1]").pack()
@@ -356,7 +415,7 @@ def init_window():
     C.tag_bind("token", "<B1-Motion>", daPoint.drag)
     C.bind('<Configure>', create_grid)
 
-    
+
 
 def main():
     #driver code
